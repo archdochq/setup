@@ -58,3 +58,14 @@ jobs:
           archdoc init --name Test --no-interaction
           archdoc lint
           archdoc index --check
+
+  # The README tells people to write archdochq/setup@v1, which resolves the
+  # action from the tag rather than from this checkout. Same code, different
+  # resolution path, and it is the form everyone actually uses.
+  tagged:
+    name: as archdochq/setup@v1
+    runs-on: ubuntu-latest
+    steps:
+      - uses: archdochq/setup@v1
+      - shell: bash
+        run: archdoc --version
