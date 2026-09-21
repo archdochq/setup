@@ -13,16 +13,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Every platform the release publishes for, because the action picks the
-  # archive from the runner's own OS and architecture and a wrong guess only
-  # shows up on the platform that has it.
+  # The action picks its archive from the runner's own OS and architecture, so
+  # a wrong guess shows up only on the platform that has it. Every combination
+  # the release publishes for is covered here except darwin/amd64: macos-13 is
+  # the Intel image and failed to get a runner on two consecutive attempts, so
+  # a job that never starts was reporting nothing while looking like coverage.
+  # That one case differs from macos-latest only in the architecture the
+  # archive name carries.
   install:
     name: ${{ matrix.runner }}, ${{ matrix.version }}
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-13, windows-latest]
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
         version: [latest]
         include:
           # A pinned version resolves differently from latest, so it is worth
