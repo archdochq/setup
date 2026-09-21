@@ -1,0 +1,105 @@
+name: Set up ArchDoc
+description: Install the archdoc CLI and put it on PATH.
+author: ArchDoc
+
+branding:
+  icon: book-open
+  color: blue
+
+inputs:
+  version:
+    description: >
+      The release to install, such as v0.2.0, or latest. Pin it: a repository
+      should not have the rules it is held to change underneath it.
+    required: false
+    default: latest
+
+outputs:
+  version:
+    description: The release that was installed, as a tag.
+    value: ${{ steps.install.outputs.version }}
+  path:
+    description: The directory the binary was installed into.
+    value: ${{ steps.install.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - id: install
+      shell: bash
+      env:
+        ARCHDOC_VERSION: ${{ inputs.version }}
+        ARCHDOC_REPO: archdochq/archdoc
+      run: |
+        set -euo pipefail
+
+        case "$RUNNER_OS" in
+          Linux)   os=linux   ;;
+          macOS)   os=darwin  ;;
+          Windows) os=windows ;;
+          *) echo "::error::unsupported runner OS: $RUNNER_OS"; exit 1 ;;
+        esac
+        case "$RUNNER_ARCH" in
+          X64)   arch=amd64 ;;
+          ARM64) arch=arm64 ;;
+          *) echo "::error::unsupported runner architecture: $RUNNER_ARCH"; exit 1 ;;
+        esac
+
+        # "latest" is resolved to a tag rather than downloaded from the latest
+        # URL, because the archive name carries the version and the two have to
+        # agree.
+        if [ "$ARCHDOC_VERSION" = "latest" ]; then
+          base="https://github.com/$ARCHDOC_REPO/releases/latest/download"
+          tag="$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+            "https://github.com/$ARCHDOC_REPO/releases/latest" | sed 's#.*/tag/##')"
+        else
+          tag="$ARCHDOC_VERSION"
+          base="https://github.com/$ARCHDOC_REPO/releases/download/$tag"
+        fi
+
+        extension=tar.gz
+        binary=archdoc
+        if [ "$os" = windows ]; then
+          extension=zip
+          binary=archdoc.exe
+        fi
+        archive="archdoc_${tag#v}_${os}_${arch}.${extension}"
+
+        # Downloaded outside the checkout. curl -O writes into the working
+        # directory, which is the tree actions/checkout populated, and it opens
+        # with fopen("wb"), which writes through an existing symbolic link: one
+        # committed under the archive's name would redirect the download.
+        work="$(mktemp -d)"
+        cd "$work"
+
+        curl -fsSL -O "$base/$archive"
+        curl -fsSL -O "$base/checksums.txt"
+
+        # The binary is about to run over the repository, so check it is the one
+        # the release published. macOS runners ship shasum rather than
+        # sha256sum, and the check is not optional on either.
+        if command -v sha256sum >/dev/null 2>&1; then
+          grep " $archive\$" checksums.txt | sha256sum -c -
+        else
+          grep " $archive\$" checksums.txt | shasum -a 256 -c -
+        fi
+
+        case "$extension" in
+          tar.gz) tar -xzf "$archive" "$binary" ;;
+          zip)    unzip -q -o "$archive" "$binary" ;;
+        esac
+
+        # Into the runner's temporary directory rather than a system path: it
+        # needs no privileges and is cleaned up with the job.
+        destination="$RUNNER_TEMP/archdoc-$tag"
+        mkdir -p "$destination"
+        cp "$binary" "$destination/$binary"
+        chmod +x "$destination/$binary"
+
+        echo "$destination" >> "$GITHUB_PATH"
+        echo "version=$tag" >> "$GITHUB_OUTPUT"
+        echo "path=$destination" >> "$GITHUB_OUTPUT"
+
+        cd - > /dev/null
+        rm -rf "$work"
+        echo "ArchDoc $tag installed for ${os}/${arch}"

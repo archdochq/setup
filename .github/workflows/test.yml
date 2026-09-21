@@ -1,0 +1,51 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Every platform the release publishes for, because the action picks the
+  # archive from the runner's own OS and architecture and a wrong guess only
+  # shows up on the platform that has it.
+  install:
+    name: ${{ matrix.runner }}, ${{ matrix.version }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-13, windows-latest]
+        version: [latest]
+        include:
+          # A pinned version resolves differently from latest, so it is worth
+          # one run of its own rather than trusting that both paths work.
+          - runner: ubuntu-latest
+            version: v0.2.0
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: setup
+        uses: ./
+        with:
+          version: ${{ matrix.version }}
+
+      - name: The binary runs and is the version the action reported
+        shell: bash
+        run: |
+          set -euo pipefail
+          got="$(archdoc --version)"
+          echo "reported ${{ steps.setup.outputs.version }}, binary says $got"
+          [ "$got" = "${{ steps.setup.outputs.version }}" ]
+
+      - name: And it works on a repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/spec" && cd "$RUNNER_TEMP/spec"
+          git init -q .
+          archdoc init --name Test --no-interaction
+          archdoc lint
+          archdoc index --check
