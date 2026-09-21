@@ -1,5 +1,7 @@
 # archdochq/setup
 
+[![Use this action](https://img.shields.io/badge/GitHub_Marketplace-Use_this_action-2088FF?logo=github&logoColor=white)](https://github.com/marketplace/actions/set-up-archdoc)
+
 Installs the [ArchDoc](https://github.com/archdochq/archdoc) CLI and puts it on
 `PATH`.
 
