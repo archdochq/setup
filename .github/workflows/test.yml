@@ -7,6 +7,11 @@ on:
 permissions:
   contents: read
 
+# A superseded run tells you nothing, and this is five runners deep.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Every platform the release publishes for, because the action picks the
   # archive from the runner's own OS and architecture and a wrong guess only
